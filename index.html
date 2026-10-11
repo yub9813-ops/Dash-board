@@ -1,0 +1,599 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>필코 자산 대시보드</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard-dynamic-subset.min.css">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#141926; --card:#1d2435; --card2:#232b40;
+  --ink:#f2f4f8; --sub:#8b93a7; --line:#2b3450;
+  --up:#ff5d5d; --down:#4d8dff; --gold:#f5b63e;
+  /* 전략별 고정 색 (검증 통과 팔레트) */
+  --c-duseu:#25ab91; --c-pyeong:#bd8415; --c-tteol:#4d8dff;
+  --c-re1:#cf4f85; --c-re2:#8f7cf0;
+  /* 도넛 전용 — 페라리 계기판: 로쏘 / 지알로 / 실버 */
+  --d-rosso:#e8322d; --d-giallo:#f5c500; --d-silver:#d7dce6;
+}
+body{font-family:Pretendard,-apple-system,system-ui,sans-serif;background:var(--bg);color:var(--ink);-webkit-font-smoothing:antialiased}
+.num{font-variant-numeric:tabular-nums;letter-spacing:-.01em}
+.wrap{max-width:480px;margin:0 auto;padding:26px 16px 44px}
+.up{color:var(--up)}.down{color:var(--down)}
+
+.h-label{font-size:.95rem;color:var(--sub);font-weight:600}
+.h-total{font-size:2.2rem;font-weight:800;letter-spacing:-.03em;margin:4px 0 2px}
+.h-sub{font-size:.84rem;color:var(--sub);font-weight:500;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.h-sub input{
+  width:58px;background:var(--card2);border:1px solid var(--line);border-radius:7px;
+  color:var(--ink);font:inherit;font-weight:700;text-align:right;padding:2px 6px;
+}
+.stats{display:flex;margin:20px 0 8px}
+.stats>div{flex:1;padding-left:12px;border-left:2px solid var(--line)}
+.stats>div:first-child{padding-left:0;border-left:0}
+.stats .l{font-size:.8rem;color:var(--sub);font-weight:600;margin-bottom:3px}
+.stats .v{font-size:1.02rem;font-weight:800}
+.stats .v small{font-size:.76rem;font-weight:600}
+
+.card{background:var(--card);border-radius:20px;padding:18px;margin-top:14px}
+.card h3{font-size:1rem;font-weight:800;margin-bottom:4px}
+.card .cap{font-size:.74rem;color:var(--sub);font-weight:500}
+
+/* 자산 구성 (도넛 2개 가로) */
+.comp2{display:flex;gap:12px;margin-top:12px}
+.dblock{flex:1;text-align:center;min-width:0}
+.dblock .dt{font-size:.78rem;color:var(--sub);font-weight:700;margin-bottom:8px}
+.legend{font-size:.78rem;margin-top:8px;text-align:left}
+.legend .li{display:flex;align-items:center;gap:6px;padding:3px 0;font-weight:600}
+.legend .dot{width:8px;height:8px;border-radius:3px;flex:none}
+.legend .nm{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.legend .pc{color:var(--sub);font-weight:700}
+
+/* 전략 현황 */
+.strat{display:flex;align-items:center;gap:14px;padding:13px 0;border-bottom:1px solid var(--line)}
+.strat:last-child{border-bottom:0;padding-bottom:2px}
+.strat .mid{flex:1;min-width:0}
+.strat .nm{font-size:.95rem;font-weight:800}
+.strat .tg{font-size:.74rem;color:var(--sub);font-weight:500;margin-top:1px}
+.strat .end{text-align:right}
+.strat .pnl{font-size:.96rem;font-weight:800}
+.strat .cash{font-size:.74rem;color:var(--sub);font-weight:600;margin-top:1px}
+
+/* 도넛 등장 애니메이션 */
+.dblock svg{animation:dpop .8s cubic-bezier(.22,.9,.3,1.25) both}
+@keyframes dpop{from{transform:scale(.82);opacity:0}to{transform:scale(1);opacity:1}}
+
+/* 실현손익 */
+.perf-head{display:flex;justify-content:space-between;align-items:center}
+.seg-toggle{display:flex;background:var(--card2);border-radius:10px;padding:3px}
+.seg-toggle button{border:0;background:transparent;font-family:inherit;font-size:.8rem;font-weight:700;color:var(--sub);padding:5px 14px;border-radius:8px;cursor:pointer}
+.seg-toggle button.on{background:#3a4463;color:#fff}
+.perf-sum{font-size:1.18rem;font-weight:800;margin:10px 0 4px}
+.perf-sum small{font-size:.78rem;font-weight:600;color:var(--sub);margin-left:6px}
+.chart{display:flex;align-items:flex-end;gap:6px;height:118px;margin-top:6px;position:relative}
+.chart .col{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;cursor:pointer}
+.chart .bval{font-size:.6rem;font-weight:700;margin-bottom:3px;white-space:nowrap;color:var(--sub)}
+.chart .bar{width:100%;max-width:34px;border-radius:5px 5px 2px 2px;background:var(--up)}
+.chart .bar.neg{background:var(--down);border-radius:2px 2px 5px 5px}
+.chart .col.sel .bar{outline:2px solid #fff}
+.chart .blab{font-size:.68rem;font-weight:600;color:var(--sub);margin-top:5px}
+.chart .col.sel .blab{color:#fff}
+#detail{margin-top:12px;border-top:1px solid var(--line);padding-top:10px;display:none}
+#detail .dh{font-size:.76rem;color:var(--sub);font-weight:600;margin-bottom:4px}
+#detail .r{display:flex;justify-content:space-between;padding:5px 0;font-size:.85rem;font-weight:700}
+#detail .r span:first-child{color:var(--ink)}
+.perf-note{margin-top:10px;font-size:.7rem;color:var(--sub);font-weight:500}
+
+/* 부동산 */
+.re{display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--line)}
+.re:last-child{border-bottom:0;padding-bottom:4px}
+.re .dot{width:9px;height:9px;border-radius:3px;flex:none}
+.re .mid{flex:1}
+.re .nm{font-size:.92rem;font-weight:800}
+.re .tg{font-size:.73rem;color:var(--sub);font-weight:500;margin-top:1px}
+.re .v{font-size:.96rem;font-weight:800;text-align:right}
+.re .vs{font-size:.72rem;color:var(--sub);font-weight:600;text-align:right}
+
+footer{margin-top:18px;text-align:center;font-size:.7rem;color:#5b647a;font-weight:500;line-height:1.7}
+</style>
+</head>
+<body>
+<div class="wrap num">
+
+  <div style="display:flex;justify-content:space-between;align-items:center">
+    <div class="h-label">자산현황 (순자산) <span style="font-weight:500;font-size:.78rem;color:#5b647a" id="asof"></span></div>
+    <div class="seg-toggle" id="cur-toggle">
+      <button class="on" data-c="krw">KRW</button>
+      <button data-c="usd">USD</button>
+    </div>
+  </div>
+  <div class="h-total" id="total">—</div>
+  <div class="h-sub">
+    <span id="total-sub">—</span>
+    <span>· 환율</span><input id="fx" type="number" value="1400" step="10" inputmode="numeric">원
+  </div>
+
+  <div class="stats">
+    <div><div class="l">올해 실현</div><div class="v up" id="st-real">—</div></div>
+    <div><div class="l">미실현손익<small style="color:var(--sub)"> (진행중)</small></div><div class="v down" id="st-eval">—</div></div>
+    <div><div class="l">진행 사이클</div><div class="v" id="st-cycle">—</div></div>
+  </div>
+
+  <div class="card">
+    <h3>자산 구성</h3>
+    <div class="comp2">
+      <div class="dblock">
+        <div class="dt">금융자산</div>
+        <svg width="108" height="108" viewBox="0 0 108 108" id="donut1"></svg>
+        <div class="legend" id="legend1"></div>
+      </div>
+      <div class="dblock">
+        <div class="dt">전체자산</div>
+        <svg width="108" height="108" viewBox="0 0 108 108" id="donut2"></svg>
+        <div class="legend" id="legend2"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>전략 현황</h3>
+    <div id="strats"></div>
+  </div>
+
+  <div class="card">
+    <div class="perf-head">
+      <h3 style="margin:0">실현손익</h3>
+      <div class="seg-toggle" id="perf-toggle">
+        <button class="on" data-m="m">월별</button>
+        <button data-m="y">연별</button>
+      </div>
+    </div>
+    <div class="perf-sum" id="perf-sum"></div>
+    <div class="chart" id="chart"></div>
+    <div id="detail"></div>
+    <div class="perf-note" id="perf-note"></div>
+  </div>
+
+  <div class="card">
+    <h3>부동산 <span class="cap">매매시세 기준 · 전세금·주담대는 부채에</span></h3>
+    <div id="re-list" style="margin-top:4px"></div>
+  </div>
+
+  <div class="card">
+    <h3>기타 자산·부채 <span class="cap">시트 「기타자산부채」 탭 수기 입력</span></h3>
+    <div id="other-list" style="margin-top:4px"></div>
+  </div>
+
+  <footer>
+    원본: 자산대시보드 데이터 시트 — 열 때마다 최신 데이터 로드<br>
+    환율·시드 미입금은 시트 [설정] 값 (페이지에서 임시 변경 가능)
+  </footer>
+</div>
+
+<script>
+/* ═══════════════ 실시간 데이터 소스 (Apps Script 웹 앱) ═══════════════ */
+const API = "https://script.google.com/macros/s/AKfycbzDJlzEYbXmhiUNiZYeL1w64X70DeOisAxmOBNaADYfkr3MmWhe6YwVqm4AqffszmWr4Q/exec";
+
+/* ═══════════════ DATA — 폴백 스냅샷 (fetch 실패 시 표시) ═══════════════ */
+const DATA = {
+  asOf: "2026-10-11",
+  strategies: [
+    { id:"duseu", name:"듀얼스나이퍼", tag:"SOXL · 계좌1 · 방어", color:"var(--c-duseu)",
+      asset:132358, evalPnl:-11066, cashPct:0.4, used:6, total:6, avg:null },
+    { id:"tteol", name:"떨사3", tag:"SOXL · 계좌1 · 중간", color:"var(--c-tteol)",
+      asset:54407, evalPnl:-1354, cashPct:49.7, used:3, total:6, avg:146.66 },
+    { id:"pyeong", name:"SOXL 평단법", tag:"무크로 자동 · 계좌2", color:"var(--c-pyeong)",
+      asset:55350, evalPnl:-295, cashPct:83.8, used:12, total:77, avg:144.41 }
+  ],
+  realEstate: [
+    { name:"해들4", color:"var(--c-re1)", price:60000 },
+    { name:"테크노1", color:"var(--c-re2)", price:34000 }
+  ],
+  /* 기타 자산·부채 (만원) — 시트 「기타자산부채」 탭 수기 입력값 (10/11) */
+  others: [
+    { t:"자산", n:"월세보증금", v:3000 },
+    { t:"자산", n:"보유현금", v:2021, memo:"마통 예치+기타통장" },
+    { t:"부채", n:"연금공단대출", v:3000 },
+    { t:"부채", n:"전세금", v:53500, memo:"해들4 26,500 + 테크노1 27,000" },
+    { t:"부채", n:"주담대", v:16500, memo:"해들4 담보대출" }
+  ],
+  misCashUsd: 45618,  // 시드 중 아직 계좌에 없는 돈 — 주식 자산에서 차감
+  /* 월별 실현손익 (USD) — 각 시트 일별 로그 집계, 누적실현과 대조검증 완료 */
+  monthly: [
+    { l:"1~4월", v:26539.75, br:[["기타퀀트 (과거전략 포함)",26539.75]] },
+    { l:"5월", v:0,        br:[] },
+    { l:"6월", v:4308.82,  br:[["듀스",4308.82]] },
+    { l:"7월", v:9060.05,  br:[["듀스",9060.05]] },
+    { l:"8월", v:-328.39,  br:[["떨사3",988],["평단법",6.64],["듀스",-1323.03]] },
+    { l:"9월", v:10892.7,  br:[["듀스",8007.84],["평단법",1849.86],["떨사3",1035]] },
+    { l:"10월", v:2771.02, br:[["듀스",2483.04],["평단법",287.98]] }
+  ],
+  yearly: [ { l:"2026", v:53243.95,
+    br:[["기타퀀트 (과거전략 포함)",26540.54],["듀스",22536.72],["평단법",2144.48],["떨사3",2022.21]] } ],
+
+  series: null
+};
+
+/* ═══════════════ 계산 ═══════════════ */
+const fmt$ = v => (v<0?"−$":"+$") + Math.abs(Math.round(v)).toLocaleString();
+const fmt$p = v => "$" + Math.round(v).toLocaleString();
+const 억 = v => (v/10000).toFixed(1).replace(/\.0$/,"") + "억";   // 만원 → 억
+
+let stockUsd=0, reGross=0, otherAsset=0, otherDebt=0, stockReal=0, evalSum=0;
+function recompute(){
+  stockUsd  = DATA.strategies.reduce((a,s)=>a+s.asset,0);
+  reGross   = DATA.realEstate.reduce((a,r)=>a+r.price,0);  // 시세 합, 만원
+  otherAsset= DATA.others.filter(o=>o.t==="자산").reduce((a,o)=>a+(o.v||0),0);
+  otherDebt = DATA.others.filter(o=>o.t==="부채").reduce((a,o)=>a+(o.v||0),0);
+  stockReal = stockUsd - DATA.misCashUsd;  // 주식(실제) = 시트 − 미입금
+  evalSum   = DATA.strategies.reduce((a,s)=>a+s.evalPnl,0);
+}
+
+let cur = "krw";
+function getFx(){
+  const v = Number(document.getElementById("fx").value);
+  return (v>=800 && v<=2500) ? v : 1400;
+}
+function renderTotal(){
+  const fx = getFx();
+  const assetKrw = stockReal*fx + (reGross + otherAsset)*10000; // 자산: 주식(실제)+부동산시세+기타자산
+  const debtKrw  = otherDebt*10000;                             // 부채: 연금·전세금·주담대
+  const netKrw = assetKrw - debtKrw;
+  const K = v => "₩" + (v/100000000).toFixed(2) + "억";
+  const U = v => "$" + Math.round(v).toLocaleString();
+  document.getElementById("total").textContent = cur==="krw" ? K(netKrw) : U(netKrw/fx);
+  document.getElementById("total-sub").textContent = cur==="krw"
+    ? "자산 " + K(assetKrw) + " − 부채 " + K(debtKrw)
+    : "자산 " + U(assetKrw/fx) + " − 부채 " + U(debtKrw/fx);
+  renderDonut(fx);
+  if(typeof renderStats==="function") renderStats();
+  if(typeof renderPerf==="function" && document.getElementById("chart")) try{ renderPerf(); }catch(e){}
+}
+document.querySelectorAll("#cur-toggle button").forEach(b=>b.onclick=()=>{
+  document.querySelectorAll("#cur-toggle button").forEach(x=>x.classList.remove("on"));
+  b.classList.add("on"); cur=b.dataset.c;
+  try{ localStorage.setItem("cur",cur); }catch(e){}
+  renderTotal();
+});
+try{
+  const sc=localStorage.getItem("cur");
+  if(sc==="usd"||sc==="krw"){ cur=sc;
+    document.querySelectorAll("#cur-toggle button").forEach(x=>x.classList.toggle("on",x.dataset.c===cur));
+  }
+}catch(e){}
+function renderStats(){
+  const fx = getFx();
+  document.getElementById("st-real").textContent = fmtPerf(DATA.yearly[0].v, fx);
+  document.getElementById("st-eval").textContent = fmtPerf(evalSum, fx);
+}
+
+/* ── 자산 구성 도넛 2개 (금융 / 전체) ── */
+function shade(hex,p){ // p>0 밝게, p<0 어둡게
+  const n=parseInt(hex.trim().slice(1),16);
+  let r=n>>16, g=(n>>8)&255, b=n&255;
+  const t=p<0?0:255, q=Math.abs(p);
+  r=Math.round(r+(t-r)*q); g=Math.round(g+(t-g)*q); b=Math.round(b+(t-b)*q);
+  return "#"+((1<<24)+(r<<16)+(g<<8)+b).toString(16).slice(1);
+}
+function drawDonut(svgId, legendId, items, fx){
+  const tot = items.reduce((a,b)=>a+b.v,0);
+  const R=36, C=2*Math.PI*R; let acc=0;
+  const center = cur==="krw" ? "₩"+((tot*fx)/100000000).toFixed(1)+"억" : "$"+Math.round(tot/1000)+"K";
+
+  /* 계기판 눈금 링 — 굵은 눈금 + 잔눈금, 끝부분은 레드존 */
+  let ticks="";
+  for(let i=0;i<48;i++){
+    const a=i/48*2*Math.PI - Math.PI/2;
+    const major=(i%4===0), r1=46, r2=major?51:49;
+    const red = i>=41 && i<=46;
+    ticks+=`<line x1="${(54+r1*Math.cos(a)).toFixed(1)}" y1="${(54+r1*Math.sin(a)).toFixed(1)}"
+      x2="${(54+r2*Math.cos(a)).toFixed(1)}" y2="${(54+r2*Math.sin(a)).toFixed(1)}"
+      stroke="${red?"#e8322d":"rgba(215,220,230,.38)"}" stroke-width="${major?1.8:1}"/>`;
+  }
+
+  /* 슬라이스별 메탈릭 그라데이션 (안쪽 어둡게 → 바깥 광택) */
+  const grads = items.map((it,i)=>`
+    <radialGradient id="sg-${svgId}-${i}" gradientUnits="userSpaceOnUse" cx="54" cy="54" r="46">
+      <stop offset="60%" stop-color="${shade(it.c,-0.38)}"/>
+      <stop offset="78%" stop-color="${it.c.trim()}"/>
+      <stop offset="97%" stop-color="${shade(it.c,0.35)}"/>
+    </radialGradient>`).join("");
+
+  const slices = items.map((it,i)=>{
+    const f=it.v/tot, rot=acc/tot*360-90; acc+=it.v;
+    return `<circle cx="54" cy="54" r="${R}" fill="none" stroke="url(#sg-${svgId}-${i})" stroke-width="12"
+      filter="url(#glow-${svgId})"
+      stroke-dasharray="${Math.max(C*f-2,0.5)} ${C-Math.max(C*f-2,0.5)}" transform="rotate(${rot} 54 54)"/>`;
+  }).join("");
+
+  document.getElementById(svgId).innerHTML = `
+    <defs>
+      <filter id="glow-${svgId}" x="-40%" y="-40%" width="180%" height="180%">
+        <feGaussianBlur stdDeviation="3" result="b"/>
+        <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+      </filter>
+      <radialGradient id="core-${svgId}" cx="50%" cy="36%" r="80%">
+        <stop offset="0%" stop-color="#2b3450"/><stop offset="100%" stop-color="#0d111c"/>
+      </radialGradient>
+      <linearGradient id="bez-${svgId}" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="rgba(230,235,245,.55)"/>
+        <stop offset="50%" stop-color="rgba(120,130,150,.15)"/>
+        <stop offset="100%" stop-color="rgba(230,235,245,.35)"/>
+      </linearGradient>
+      ${grads}
+    </defs>
+    <circle cx="54" cy="54" r="52.8" fill="none" stroke="url(#bez-${svgId})" stroke-width="1.4"/>
+    ${ticks}
+    ${slices}
+    <circle cx="54" cy="54" r="${R}" fill="none" stroke="rgba(255,255,255,.16)" stroke-width="12"
+      stroke-dasharray="${(C*0.26).toFixed(1)} ${C.toFixed(1)}" transform="rotate(-128 54 54)"/>
+    <circle cx="54" cy="54" r="27" fill="url(#core-${svgId})" stroke="rgba(255,255,255,.08)" stroke-width="1"/>
+    <text x="54" y="59" text-anchor="middle" fill="#fff" font-size="13" font-weight="800"
+      font-style="italic" font-family="Pretendard,sans-serif">${center}</text>`;
+
+  document.getElementById(legendId).innerHTML = items.map(it=>
+    `<div class="li"><span class="dot" style="background:${it.c.trim()}"></span>
+     <span class="nm">${it.n}</span><span class="pc">${(it.v/tot*100).toFixed(0)}%</span></div>`).join("");
+}
+function renderDonut(fx){
+  const cashManwon = DATA.others.filter(o=>o.t==="자산" && o.n==="보유현금").reduce((a,o)=>a+o.v,0);
+  const css = n => getComputedStyle(document.documentElement).getPropertyValue(n);
+  const 주식 = { n:"주식(보유)", c:css("--d-rosso"), v:stockReal };
+  const 현금 = { n:"현금", c:css("--d-silver"), v:cashManwon*10000/fx };
+  const 부동산 = { n:"부동산", c:css("--d-giallo"), v:reGross*10000/fx };
+  drawDonut("donut1","legend1",[주식, 현금], fx);
+  drawDonut("donut2","legend2",[주식, 부동산, 현금], fx);
+}
+function cssVar(s){ return s.replace("var(","").replace(")",""); }
+
+/* ── 전략 현황 ── */
+function renderStrats(){
+document.getElementById("st-cycle").textContent = DATA.strategies.length + "건";
+document.getElementById("strats").innerHTML = DATA.strategies.map(s=>{
+  const pct=s.used/s.total, r=20, c=2*Math.PI*r, off=c*(1-pct);
+  const gcol = pct>0.66 ? "#ff5d5d" : pct>0.33 ? "#e8b04a" : "#2fbfa4";
+  return `<div class="strat">
+    <svg width="52" height="52" viewBox="0 0 52 52">
+      <circle cx="26" cy="26" r="${r}" fill="none" stroke="#2b3450" stroke-width="6"/>
+      <circle cx="26" cy="26" r="${r}" fill="none" stroke="${gcol}" stroke-width="6"
+        stroke-dasharray="${c}" stroke-dashoffset="${off}" stroke-linecap="round" transform="rotate(-90 26 26)"/>
+      <text x="26" y="30" text-anchor="middle" fill="#f2f4f8" font-size="11" font-weight="800" font-family="Pretendard,sans-serif">${s.used}/${s.total}</text>
+    </svg>
+    <div class="mid"><div class="nm">${s.name}</div><div class="tg">${s.tag} · ${fmt$p(s.asset)}</div></div>
+    <div class="end">
+      <div class="pnl ${s.evalPnl<0?"down":"up"}">${fmt$(s.evalPnl)}</div>
+      <div class="cash">비중 ${(s.asset/stockUsd*100).toFixed(1)}% · 현금 ${s.cashPct}%</div>
+    </div>
+  </div>`;
+}).join("");
+}
+
+
+/* ── 실현손익 월별/연별 + 막대 탭 상세 ── */
+let mode="m", selIdx=-1;
+const toggle=document.querySelectorAll("#perf-toggle button");
+/* 통화 토글 반영 금액 포맷: KRW는 만원 단위 */
+function fmtPerf(v, fx){
+  if(cur==="krw"){
+    const m = v*fx/10000;
+    return (m<0?"−":"+") + Math.abs(Math.round(m)).toLocaleString() + "만";
+  }
+  return fmt$(v);
+}
+function fmtBar(v, fx){
+  if(v===0) return "·";
+  if(cur==="krw"){
+    const m = v*fx/10000;
+    return (m<0?"−":"") + Math.abs(Math.round(m)).toLocaleString();
+  }
+  return (v<0?"−":"") + Math.abs(Math.round(v)).toLocaleString();
+}
+function renderPerf(){
+  const fx = getFx();
+  const rows = mode==="m" ? DATA.monthly : DATA.yearly;
+  const total = mode==="m" ? rows.reduce((a,b)=>a+b.v,0) : DATA.yearly[0].v;
+  document.getElementById("perf-sum").innerHTML =
+    `<span class="${total>=0?"up":"down"}">${fmtPerf(total,fx)}</span><small>${mode==="m"?"올해 합계 (1~10월)":"연도 합계"}</small>`;
+  const max=Math.max(...rows.map(r=>Math.abs(r.v)),1);
+  document.getElementById("chart").innerHTML = rows.map((r,i)=>{
+    const h=Math.max(Math.abs(r.v)/max*82, r.v===0?2:6);
+    return `<div class="col${i===selIdx?" sel":""}" data-i="${i}">
+      <div class="bval">${fmtBar(r.v,fx)}</div>
+      <div class="bar${r.v<0?" neg":""}" style="height:${h}px"></div>
+      <div class="blab">${r.l}</div>
+    </div>`;
+  }).join("");
+
+  /* 누적 실현손익 선 그래프 오버레이 (월별 모드) */
+  if(mode==="m"){
+    const chartEl = document.getElementById("chart");
+    const cum=[]; let c=0; rows.forEach(r=>{ c+=r.v; cum.push(c); });
+    const W = chartEl.clientWidth || 420, H=118, n=rows.length;
+    const mn=Math.min(...cum,0), mx=Math.max(...cum,1);
+    const Y=v=>16 + (68-16)*(1-(v-mn)/(mx-mn));
+    const pts=cum.map((v,i)=>[(i+0.5)*W/n, Y(v)]);
+    const poly=pts.map(p=>p[0].toFixed(1)+","+p[1].toFixed(1)).join(" ");
+    chartEl.insertAdjacentHTML("beforeend",
+      `<svg style="position:absolute;left:0;top:0;width:100%;height:${H}px;pointer-events:none;overflow:visible">
+        <polyline points="${poly}" fill="none" stroke="#f5c500" stroke-width="2.2" stroke-linejoin="round"
+          style="filter:drop-shadow(0 0 5px rgba(245,197,0,.55))"/>
+        ${pts.map(p=>`<circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="3" fill="#f5c500" stroke="#141926" stroke-width="1.5"/>`).join("")}
+        <text x="${(pts[n-1][0]-6).toFixed(1)}" y="${(pts[n-1][1]-8).toFixed(1)}" text-anchor="end" fill="#f5c500"
+          font-size="10" font-weight="700" font-family="Pretendard,sans-serif">누적 ${fmtPerf(cum[n-1],fx)}</text>
+      </svg>`);
+  }
+
+  document.getElementById("perf-note").textContent =
+    mode==="m" ? "※ 1~4월 = 과거전략·기타 누계 (월별 기록 없음) · 노란 선 = 누적 실현 · 막대 탭 = 상세"
+               : "※ 듀스·떨사3 금액은 사이클별 분해 전 누계";
+  renderDetail(rows);
+  document.querySelectorAll("#chart .col").forEach(col=>{
+    col.onclick=()=>{ const i=+col.dataset.i; selIdx = (selIdx===i? -1 : i); renderPerf(); };
+  });
+}
+function renderDetail(rows){
+  const box=document.getElementById("detail");
+  if(selIdx<0 || !rows[selIdx] || !rows[selIdx].br.length){ box.style.display="none"; return; }
+  const r=rows[selIdx];
+  box.style.display="block";
+  box.innerHTML = `<div class="dh">${r.l} 전략별 실현손익</div>` +
+    r.br.map(([n,v])=>`<div class="r"><span>${n}</span><span class="${v<0?"down":"up"}">${fmtPerf(v,getFx())}</span></div>`).join("");
+}
+toggle.forEach(b=>b.onclick=()=>{
+  toggle.forEach(x=>x.classList.remove("on")); b.classList.add("on");
+  mode=b.dataset.m; selIdx=-1; renderPerf();
+});
+renderPerf();
+
+/* ── 부동산 ── */
+function renderRe(){
+document.getElementById("re-list").innerHTML = DATA.realEstate.map(r=>{
+  return `<div class="re">
+    <span class="dot" style="background:${getComputedStyle(document.documentElement).getPropertyValue(cssVar(r.color)).trim()}"></span>
+    <div class="mid"><div class="nm">${r.name}</div></div>
+    <div>
+      <div class="v">₩${억(r.price)}</div>
+      <div class="vs">매매시세</div>
+    </div>
+  </div>`;
+}).join("");
+}
+
+/* ── 기타 자산·부채 ── */
+function renderOthers(){
+document.getElementById("other-list").innerHTML = DATA.others.map(o=>{
+  const sign = o.t==="부채" ? "−" : "";
+  let val;
+  if(o.vUsd) val = sign + "$" + Math.round(o.vUsd).toLocaleString();
+  else if(o.v>0) val = sign + "₩" + 억(o.v);
+  else val = null;
+  return `<div class="re">
+    <div class="mid">
+      <div class="nm">${o.n} <span style="font-size:.7rem;font-weight:600;color:${o.t==="부채"?"var(--down)":"var(--sub)"}">${o.t}</span></div>
+      ${o.memo?`<div class="tg">${o.memo}</div>`:""}
+    </div>
+    <div>
+      <div class="v" style="${val?"":"color:var(--sub);font-weight:600;font-size:.8rem"}">${val||"입력 대기"}</div>
+    </div>
+  </div>`;
+}).join("");
+}
+
+/* ═══════════════ 실시간 로딩 ═══════════════ */
+function toN(v){
+  if(typeof v==="number") return v;
+  if(v===null||v===undefined) return NaN;
+  const s=String(v).replace(/[$,%\s원만]/g,"").replace(/−/g,"-");
+  return s===""?NaN:Number(s);
+}
+function isoDate(v){
+  const d=new Date(v); if(isNaN(d)) return null;
+  return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");
+}
+const BAKED_UNTIL = "2026-10-11";  // 이 날짜까지의 실현손익은 아래 스냅샷에 포함됨
+
+function applyLive(j){
+  /* 현재상태 → 전략 */
+  const meta = {
+    "듀스":  { name:"듀얼스나이퍼", tag:"SOXL · 계좌1", color:"var(--c-duseu)" },
+    "떨사3": { name:"떨사3",       tag:"SOXL · 계좌1", color:"var(--c-tteol)" },
+    "평단법":{ name:"SOXL 평단법",  tag:"무크로 자동 · 계좌2", color:"var(--c-pyeong)" }
+  };
+  if(j.status && j.status.length>1){
+    const rows = j.status.slice(1).filter(r=>r && r[0]);
+    if(rows.length){
+      DATA.strategies = rows.map(r=>{
+        const warn = /⚠️/.test(String(r[0]));
+        const key = String(r[0]).replace("⚠️","").trim();
+        const m = meta[key] || { name:key, tag:"", color:"var(--c-duseu)" };
+        let cp = toN(r[4]); if(!isNaN(cp) && cp<=1) cp*=100;
+        const tiers = String(r[5]||"").split("/");
+        return { name: m.name + (warn?" ⚠️":""), tag:m.tag, color:m.color,
+          asset: toN(r[2])||0, evalPnl: toN(r[8])||0,
+          cashPct: isNaN(cp)?"–":Math.round(cp*10)/10,
+          used: toN(tiers[0])||0, total: toN(tiers[1])||1 };
+      });
+    }
+  }
+  /* 부동산: 물건별 가장 최근 시세 */
+  if(j.re && j.re.length>1){
+    const latest={}, order=[];
+    j.re.slice(1).forEach(r=>{
+      const nm=r&&r[1]?String(r[1]).trim():""; const pr=toN(r&&r[2]);
+      if(nm && !isNaN(pr) && pr>0){ if(!(nm in latest)) order.push(nm); latest[nm]=pr; }
+    });
+    if(order.length){
+      const cols=["var(--c-re1)","var(--c-re2)","var(--c-pyeong)","var(--c-tteol)"];
+      DATA.realEstate = order.map((nm,i)=>({ name:nm, color:cols[i%4], price:latest[nm] }));
+    }
+  }
+  /* 기타자산부채 + [설정] */
+  if(j.others && j.others.length){
+    const rows=[];
+    j.others.forEach(r=>{
+      if(!r) return;
+      const t=String(r[0]||"").trim();
+      if(t==="자산"||t==="부채"){
+        const v=toN(r[2]);
+        if(!isNaN(v)&&v>0) rows.push({ t, n:String(r[1]||""), v, memo:r[3]?String(r[3]):"" });
+      }
+      r.forEach((cell,ci)=>{
+        const s=String(cell||"");
+        if(s.indexOf("[설정]")>=0 && s.indexOf("환율")>=0){
+          const vv=toN(r[ci+1]); if(vv>=800&&vv<=2500) document.getElementById("fx").value=vv;
+        }
+        if(s.indexOf("시드 미입금")>=0){
+          const vv=toN(r[ci+1]); if(!isNaN(vv)&&vv>=0) DATA.misCashUsd=vv;
+        }
+      });
+    });
+    if(rows.length) DATA.others=rows;
+  }
+  /* 사이클이력 → 스냅샷 이후 청산분을 월별/연별에 증분 합산 */
+  if(j.cycles && j.cycles.length>1){
+    j.cycles.slice(1).forEach(r=>{
+      if(!r || !r[0]) return;
+      const d=isoDate(r[0]); if(!d || d<=BAKED_UNTIL) return;
+      if(/과거|누계|잔차/.test(String(r[2]||""))) return;
+      const v=toN(r[6]); if(isNaN(v)||v===0) return;
+      const strat=String(r[1]||"");
+      const mKey=parseInt(d.slice(5,7),10)+"월";
+      let row=DATA.monthly.find(x=>x.l===mKey);
+      if(!row){ row={l:mKey,v:0,br:[]}; DATA.monthly.push(row); }
+      row.v+=v;
+      const bi=row.br.find(b=>b[0]===strat); if(bi) bi[1]+=v; else row.br.push([strat,v]);
+      DATA.yearly[0].v+=v;
+      const yb=DATA.yearly[0].br.find(b=>b[0]===strat); if(yb) yb[1]+=v; else DATA.yearly[0].br.push([strat,v]);
+    });
+  }
+  if(j.updated) document.getElementById("asof").textContent = "· 실시간 " + j.updated;
+}
+
+function renderAll(){
+  recompute();
+  renderStrats();
+  renderRe();
+  renderOthers();
+  renderTotal();   // 내부에서 도넛·스탯·실현손익까지 갱신
+}
+
+/* 환율 입력 → 재계산 */
+document.getElementById("fx").addEventListener("input", renderTotal);
+
+/* 초기: 스냅샷 먼저 → 실시간 데이터로 교체 */
+try{
+  const sc=localStorage.getItem("cur");
+  if(sc==="usd"||sc==="krw"){ cur=sc;
+    document.querySelectorAll("#cur-toggle button").forEach(x=>x.classList.toggle("on",x.dataset.c===cur));
+  }
+}catch(e){}
+document.getElementById("asof").textContent = "· " + DATA.asOf + " 스냅샷";
+renderAll();
+fetch(API, {redirect:"follow"})
+  .then(r=>{ if(!r.ok) throw new Error(r.status); return r.json(); })
+  .then(j=>{ applyLive(j); renderAll(); })
+  .catch(e=>{ document.getElementById("asof").textContent = "· " + DATA.asOf + " 스냅샷 (오프라인)"; });
+</script>
+</body>
+</html>
